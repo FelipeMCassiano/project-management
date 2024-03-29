@@ -9,6 +9,7 @@ import {
     deleteProject,
     deleteTask,
 } from "./repository/repository";
+import { connect } from "http2";
 
 async function connectDb(): Promise<pg.Pool> {
     dotenv.config();
@@ -21,6 +22,7 @@ async function connectDb(): Promise<pg.Pool> {
 async function main() {
     const db = await connectDb();
     const pool = await db.connect();
+    const port = 3000;
 
     const app = express();
     app.use(express.json());
@@ -86,6 +88,8 @@ async function main() {
 
         return res.status(200);
     });
+
+    app.listen(port, () => console.log("listenin..."));
 }
 
 main();
