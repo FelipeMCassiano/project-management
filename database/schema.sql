@@ -5,6 +5,8 @@ CREATE TABLE project (
     created_at  TIMESTAMPZ NOT NULL DEFAULT NOW(),
     tasks INTEGER DEFAULT 0,
     completion INTEGER DEFAULT 0
+    completed_tasks INTEGER DEFAULT 0,
+    incompleted_tasks INTEGER DEFAULT 0
 );
 
 CREATE TABLE task (
@@ -15,5 +17,5 @@ CREATE TABLE task (
     created_at  TIMESTAMPZ NOT NULL DEFAULT NOW(),
     completed_at TIMESTAMPZ,
     completd BOOLEAN,
-    CONSTRAINT fk_projects_tasks_id FOREIGN KEY(project_id) REFERENCES project(id)
+    CONSTRAINT fk_projects_tasks_id FOREIGN KEY(project_id) REFERENCES project(id) ON DELETE CASCADE
 );
