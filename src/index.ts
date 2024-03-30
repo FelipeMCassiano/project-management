@@ -8,12 +8,45 @@ import {
     createNewTask,
     deleteProject,
     deleteTask,
+    searchProjects,
+    searchTasks,
 } from "./repository/repository";
-import { connect } from "http2";
+import { error } from "console";
+
+function validateProject(project: IProject): null | IProject {
+    if (!project.name || !project.description) {
+        return null;
+    }
+
+    if (
+        project.name.length <= 1 ||
+        project.description.length <= 1 ||
+        project.description.length < 200 ||
+        project.name.length < 50
+    ) {
+        return null;
+    }
+
+    return project;
+}
+
+function validateTask(task: ITask): null | ITask {
+    if (!task.name || !task.description || !task.project_id) {
+        return null;
+    }
+
+    if (task.name.length > 50 || task.name.length <= 1 || task.description.length <= 1) {
+        return null;
+    }
+
+    return task;
+}
 
 async function connectDb(): Promise<pg.Pool> {
     dotenv.config();
-    const url = process.env.DATABASEURL;
+    const url =
+        process.env.DATABASEURL ||
+        "postgres://projectmanager:projectmanager@localhost:5432?sslmode=disable";
 
     const pool = new pg.Pool({ connectionString: url });
     return pool;
@@ -29,8 +62,12 @@ async function main() {
 
     app.post("/projects/create", async (req: Request, res: Response) => {
         const request: IProject = req.body;
+        const validated = validateProject(request);
+        if (!validated) {
+            return res.status(400).end();
+        }
 
-        const createdProject = await createNewProject(request, pool);
+        const createdProject = await createNewProject(validated, pool);
 
         if (createdProject instanceof Error) {
             return res.status(500).json({ error: createdProject.message }).end();
@@ -43,6 +80,12 @@ async function main() {
         const id = parseInt(req.params.id);
 
         const request: ITask = req.body;
+
+        const validated = validateTask(request);
+
+        if (!validated) {
+            return res.status(400).end();
+        }
 
         const createdTask = await createNewTask(id, request, pool);
 
@@ -62,6 +105,7 @@ async function main() {
 
         return res.status(200);
     });
+
     app.delete("/project/:project_id/tasks/:name/delete", async (req: Request, res: Response) => {
         const name = req.params.name;
         const project_id = parseInt(req.params.project_id);
@@ -87,6 +131,28 @@ async function main() {
         }
 
         return res.status(200);
+    });
+
+    app.get("projects/:project_id/tasks/:name/search", async (req: Request, res: Response) => {
+        const project_id = parseInt(req.params.project_id);
+
+        const name = req.params.name;
+        const result = await searchTasks(project_id, name, pool);
+        if (result instanceof Error) {
+            return res.status(500).json({ error: result.message });
+        }
+
+        return res.status(200).send(result);
+    });
+    app.get("projects/:name/search", async (req: Request, res: Response) => {
+        const name = req.params.name;
+
+        const result = await searchProjects(name, pool);
+        if (result instanceof Error) {
+            return res.status(500).json({ error: result.message });
+        }
+
+        return res.status(200).send(result);
     });
 
     app.listen(port, () => console.log("listenin..."));

@@ -1,0 +1,22 @@
+version: "3.5"
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      - POSTGRES_USER=projectmanager 
+      - POSTGRES_PASSWORD=projectmanager 
+      - POSTGRES_DB=projectmanager 
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./postgresql.conf:/docker-entrypoint-initdb.d/postgresql.conf
+    command: postgres -c config_file=/docker-entrypoint-initdb.d/postgresql.conf 
+
+     
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 1.0GB

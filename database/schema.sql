@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 CREATE TABLE project (
     id SERIAL PRIMARY KEY,
     name VARCHAR(50) NOT NULL,
@@ -19,3 +21,5 @@ CREATE TABLE task (
     completd BOOLEAN,
     CONSTRAINT fk_projects_tasks_id FOREIGN KEY(project_id) REFERENCES project(id) ON DELETE CASCADE
 );
+
+CREATE INDEX idx_project_name ON project USING gin (name gin_trgm_ops);

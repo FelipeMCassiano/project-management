@@ -1,11 +1,11 @@
-import { throws } from "assert";
-import { IProject, ITask } from "../models/models";
+import { IProject, IProjectSearch, ITask, ITaskSearch } from "../models/models";
 import pg from "pg";
 
 export async function createNewProject(
     project: IProject,
     pool: pg.PoolClient,
 ): Promise<IProject | Error> {
+    await pool.connect();
     try {
         await pool.query("BEGIN");
         const newProject = await pool.query<IProject>(
@@ -29,6 +29,7 @@ export async function createNewTask(
     task: ITask,
     pool: pg.PoolClient,
 ): Promise<ITask | Error> {
+    await pool.connect();
     try {
         await pool.query("BEGIN");
         const newTask = await pool.query<ITask>(
@@ -80,6 +81,7 @@ export async function completeTask(
     project_id: number,
     pool: pg.PoolClient,
 ): Promise<undefined | Error> {
+    await pool.connect();
     try {
         await pool.query("UPDATE task SET completed=true WHERE id =$1", [id]);
 
@@ -99,6 +101,7 @@ export async function completeTask(
 }
 
 export async function deleteProject(name: string, pool: pg.PoolClient): Promise<undefined | Error> {
+    await pool.connect();
     try {
         if (name) {
             await pool.query("DELETE project WHERE name=$1", [name]);
@@ -118,6 +121,7 @@ export async function deleteTask(
     name: string,
     pool: pg.PoolClient,
 ): Promise<undefined | Error> {
+    await pool.connect();
     try {
         const rows = await pool.query("SELECT name FROM projects WHERE id=$1", [project_id]);
 
@@ -133,6 +137,53 @@ export async function deleteTask(
         return Error("id and name not provided");
     } catch (err: any) {
         return new Error(`Failed to delete task: ${err.message}`);
+    } finally {
+        pool.release();
+    }
+}
+
+export async function searchProjects(
+    name: string,
+    pool: pg.PoolClient,
+): Promise<IProjectSearch[] | Error> {
+    await pool.connect();
+    try {
+        const rows = await pool.query<IProjectSearch>(
+            "SELECT name, description, created_at, completion, completed_tasks, incompleted_tasks FROM project WHERE name ILIKE '%' || $1 || '%'",
+            [name],
+        );
+
+        if (!rows.rowCount) {
+            return Error(`Not found project with name ${name}`);
+        }
+
+        return rows.rows;
+    } catch (err: any) {
+        return new Error(`Failed to search project: ${err.message}`);
+    } finally {
+        pool.release();
+    }
+}
+
+export async function searchTasks(
+    project_id: number,
+    name: string,
+    pool: pg.PoolClient,
+): Promise<ITaskSearch[] | Error> {
+    await pool.connect();
+    try {
+        const rows = await pool.query<ITaskSearch>(
+            "SELECT name, description, created_at, completed_at completed FROM task WHERE project_id=$1 AND name ILIKE '%' || $1 || '%'",
+            [project_id, name],
+        );
+
+        if (!rows.rowCount) {
+            return new Error(`Not found tasks with name ${name}`);
+        }
+
+        return rows.rows;
+    } catch (err: any) {
+        return new Error(`Failed to search task: ${err.message}`);
     } finally {
         pool.release();
     }
