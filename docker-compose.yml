@@ -9,7 +9,7 @@ services:
       - default
     environment:
       - APP_PORT=3000
-      - DATABASE_URL=postgres://rinha:rinha@db:5432/rinha?sslmode=disable
+      - DATABASE_URL=projectmanager:projectmanager@db:5432?sslmode=disable
     depends_on:
       - db
 
