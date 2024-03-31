@@ -56,8 +56,7 @@ async function connectDb(): Promise<pg.Pool> {
 }
 
 async function main() {
-    const db = await connectDb();
-    const pool = await db.connect();
+    const pool = await connectDb();
     const port = 3000;
 
     const app = express();
@@ -105,7 +104,7 @@ async function main() {
             return res.status(500).json({ error: result.message }).end();
         }
 
-        return res.status(200);
+        return res.status(200).end();
     });
 
     app.delete("/project/:project_id/tasks/:name/delete", async (req: Request, res: Response) => {
@@ -118,10 +117,10 @@ async function main() {
             return res.status(500).json({ error: result.message }).end();
         }
 
-        return res.status(200);
+        return res.status(200).end();
     });
 
-    app.get("projects/:project_id/tasks/:id/complete", async (req: Request, res: Response) => {
+    app.get("/projects/:project_id/tasks/:id/complete", async (req: Request, res: Response) => {
         const project_id = parseInt(req.params.project_id);
 
         const id = parseInt(req.params.id);
@@ -129,29 +128,30 @@ async function main() {
         const result = await completeTask(id, project_id, pool);
 
         if (result instanceof Error) {
-            return res.status(500).json({ error: result.message });
+            return res.status(500).json({ error: result.message }).end();
         }
 
-        return res.status(200);
+        return res.status(200).end();
     });
 
-    app.get("projects/:project_id/tasks/:name/search", async (req: Request, res: Response) => {
+    app.get("/projects/:project_id/tasks/:name/search", async (req: Request, res: Response) => {
         const project_id = parseInt(req.params.project_id);
 
         const name = req.params.name;
         const result = await searchTasks(project_id, name, pool);
         if (result instanceof Error) {
-            return res.status(500).json({ error: result.message });
+            return res.status(500).json({ error: result.message }).end();
         }
 
         return res.status(200).send(result);
     });
-    app.get("projects/:name/search", async (req: Request, res: Response) => {
+
+    app.get("/projects/:name/search", async (req: Request, res: Response) => {
         const name = req.params.name;
 
         const result = await searchProjects(name, pool);
         if (result instanceof Error) {
-            return res.status(500).json({ error: result.message });
+            return res.status(500).json({ error: result.message }).end();
         }
 
         return res.status(200).send(result);

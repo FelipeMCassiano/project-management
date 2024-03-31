@@ -3,8 +3,9 @@ import pg from "pg";
 
 export async function createNewProject(
     project: IProject,
-    pool: pg.PoolClient,
+    pgPool: pg.Pool,
 ): Promise<IProject | Error> {
+    const pool = await pgPool.connect();
     try {
         await pool.query("BEGIN");
         const newProject = await pool.query<IProject>(
@@ -21,7 +22,8 @@ export async function createNewProject(
     }
 }
 
-export async function createNewTask(task: ITask, pool: pg.PoolClient): Promise<ITask | Error> {
+export async function createNewTask(task: ITask, pgPool: pg.Pool): Promise<ITask | Error> {
+    const pool = await pgPool.connect();
     try {
         await pool.query("BEGIN");
         const newTask = await pool.query<ITask>(
@@ -47,11 +49,21 @@ export async function createNewTask(task: ITask, pool: pg.PoolClient): Promise<I
     } catch (err: any) {
         await pool.query("ROLLBACK");
         return new Error(`Failed to create task: ${err.message}`);
+    } finally {
+        pool.release();
     }
 }
 
+interface ICompletion {
+    name: string;
+    completed: boolean;
+}
+
 async function getProjectCompletion(id: number, pool: pg.PoolClient): Promise<number> {
-    const rows = await pool.query<Boolean>("SELECT completed  FROM task WHERE project_id=$1", [id]);
+    const rows = await pool.query<ICompletion>(
+        "SELECT name,completed  FROM task WHERE project_id=$1",
+        [id],
+    );
 
     if (!rows.rowCount) {
         return 0;
@@ -61,20 +73,25 @@ async function getProjectCompletion(id: number, pool: pg.PoolClient): Promise<nu
     let completedTasks = 0;
 
     for (const row of rows.rows) {
-        if (row) {
+        if (row.completed) {
             completedTasks++;
         }
     }
-    const completion = Math.floor((100 * completedTasks) / allTasks);
+    console.log("completedTasks", completedTasks);
+    console.log("all task", allTasks);
+    const completion = Math.floor((completedTasks / allTasks) * 100);
+    console.log(completion);
 
     return completion;
 }
 export async function completeTask(
     id: number,
     project_id: number,
-    pool: pg.PoolClient,
+    pgPool: pg.Pool,
 ): Promise<undefined | Error> {
+    const pool = await pgPool.connect();
     try {
+        await pool.query("BEGIN");
         await pool.query("UPDATE task SET completed=true WHERE id =$1", [id]);
 
         await pool.query("UPDATE project SET incompleted_tasks=incompleted_tasks-1 WHERE id=$1", [
@@ -84,52 +101,70 @@ export async function completeTask(
         await pool.query("UPDATE project SET completed_tasks=completed_tasks+1 WHERE id=$1", [
             project_id,
         ]);
+
+        const completion = await getProjectCompletion(project_id, pool);
+
+        await pool.query("UPDATE project SET completion=$1 WHERE id=$2", [completion, project_id]);
+
+        await pool.query("COMMIT");
         return;
     } catch (err: any) {
+        await pool.query("ROLLBACK");
         return new Error(`Failed complete: ${err.message}`);
+    } finally {
+        pool.release();
     }
 }
 
-export async function deleteProject(name: string, pool: pg.PoolClient): Promise<undefined | Error> {
+export async function deleteProject(name: string, pgPool: pg.Pool): Promise<undefined | Error> {
+    const pool = await pgPool.connect();
     try {
         if (name) {
-            await pool.query("DELETE project WHERE name=$1", [name]);
-            pool.release();
+            await pool.query("DELETE FROM project WHERE name=$1", [name]);
             return;
         }
         return Error("name not provided");
     } catch (err: any) {
         return new Error(`Failed to delete project: ${err.message}`);
+    } finally {
+        pool.release();
     }
+}
+interface IdeleteTask {
+    project_id: number;
+    name: string;
 }
 
 export async function deleteTask(
     project_id: number,
     name: string,
-    pool: pg.PoolClient,
-): Promise<undefined | Error> {
+    pgPool: pg.Pool,
+): Promise<void | Error> {
+    const pool = await pgPool.connect();
     try {
-        const rows = await pool.query("SELECT name FROM projects WHERE id=$1", [project_id]);
-
-        if (!rows.rowCount) {
-            throw new Error("cannot find project");
+        if (!name || !project_id) {
+            return new Error("id and name not provided");
         }
 
-        if (name) {
-            await pool.query("DELETE task WHERE name=$1", [name]);
-            return;
-        }
+        const rows = await pool.query<IdeleteTask>(
+            "DELETE FROM task WHERE project_id=$1 AND name=$2",
+            [project_id, name],
+        );
 
-        return Error("id and name not provided");
+        if (!rows.rowCount) return new Error("task already deleted");
+        return;
     } catch (err: any) {
         return new Error(`Failed to delete task: ${err.message}`);
+    } finally {
+        pool.release(); // Release the connection back to the pool
     }
 }
 
 export async function searchProjects(
     name: string,
-    pool: pg.PoolClient,
+    pgPool: pg.Pool,
 ): Promise<IProjectSearch[] | Error> {
+    const pool = await pgPool.connect();
     try {
         const rows = await pool.query<IProjectSearch>(
             "SELECT name, description, created_at, completion, completed_tasks, incompleted_tasks FROM project WHERE name ILIKE '%' || $1 || '%'",
@@ -143,19 +178,23 @@ export async function searchProjects(
         return rows.rows;
     } catch (err: any) {
         return new Error(`Failed to search project: ${err.message}`);
+    } finally {
+        pool.release();
     }
 }
 
 export async function searchTasks(
     project_id: number,
     name: string,
-    pool: pg.PoolClient,
+    pgPool: pg.Pool,
 ): Promise<ITaskSearch[] | Error> {
+    const pool = await pgPool.connect();
     try {
         const rows = await pool.query<ITaskSearch>(
-            "SELECT name, description, created_at, completed_at completed FROM task WHERE project_id=$1 AND name ILIKE '%' || $1 || '%'",
+            "SELECT name, description, created_at, completed_at completed FROM task WHERE project_id=$1 AND name ILIKE '%' || $2 || '%'",
             [project_id, name],
         );
+        console.log(rows.rows[0].completed);
 
         if (!rows.rowCount) {
             return new Error(`Not found tasks with name ${name}`);
@@ -164,5 +203,7 @@ export async function searchTasks(
         return rows.rows;
     } catch (err: any) {
         return new Error(`Failed to search task: ${err.message}`);
+    } finally {
+        pool.release();
     }
 }
