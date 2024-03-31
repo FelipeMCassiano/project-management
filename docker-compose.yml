@@ -1,7 +1,22 @@
 version: "3.5"
 
 services:
-  postgres:
+  api01: 
+    build : .
+    hostname: api01
+    restart: unless-stopped
+    networks:
+      - default
+    environment:
+      - APP_PORT=3000
+      - DATABASE_URL=postgres://rinha:rinha@db:5432/rinha?sslmode=disable
+    depends_on:
+      - db
+
+  db:
+    hostname: db
+    networks: 
+      - default
     image: postgres:16
     environment:
       - POSTGRES_USER=projectmanager 
@@ -20,3 +35,6 @@ services:
         limits:
           cpus: "0.5"
           memory: 1.0GB
+
+networks:
+  default:
