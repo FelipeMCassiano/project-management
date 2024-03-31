@@ -14,7 +14,7 @@ export interface IProjectSearch {
 
 export interface ITask {
     name?: string;
-    project_id?: number;
+    project_id: number;
     description?: string;
 }
 

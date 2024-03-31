@@ -11,7 +11,6 @@ import {
     searchProjects,
     searchTasks,
 } from "./repository/repository";
-import { error } from "console";
 
 function validateProject(project: IProject): null | IProject {
     if (!project.name || !project.description) {
@@ -21,8 +20,8 @@ function validateProject(project: IProject): null | IProject {
     if (
         project.name.length <= 1 ||
         project.description.length <= 1 ||
-        project.description.length < 200 ||
-        project.name.length < 50
+        project.description.length > 200 ||
+        project.name.length > 50
     ) {
         return null;
     }
@@ -31,11 +30,15 @@ function validateProject(project: IProject): null | IProject {
 }
 
 function validateTask(task: ITask): null | ITask {
-    if (!task.name || !task.description || !task.project_id) {
+    if (!task.name || !task.description) {
         return null;
     }
-
-    if (task.name.length > 50 || task.name.length <= 1 || task.description.length <= 1) {
+    if (
+        task.name.length > 50 ||
+        task.name.length <= 1 ||
+        task.description.length <= 1 ||
+        task.project_id < 1
+    ) {
         return null;
     }
 
@@ -73,13 +76,12 @@ async function main() {
             return res.status(500).json({ error: createdProject.message }).end();
         }
 
-        return res.status(201).send(createNewTask);
+        return res.status(201).send(createdProject);
     });
 
-    app.post("/projects/:id/tasks/create", async (req: Request, res: Response) => {
-        const id = parseInt(req.params.id);
-
+    app.post("/projects/tasks/create", async (req: Request, res: Response) => {
         const request: ITask = req.body;
+        console.log(request.project_id);
 
         const validated = validateTask(request);
 
@@ -87,7 +89,7 @@ async function main() {
             return res.status(400).end();
         }
 
-        const createdTask = await createNewTask(id, request, pool);
+        const createdTask = await createNewTask(request, pool);
 
         if (createdTask instanceof Error) {
             return res.status(500).json({ error: createdTask.message }).end();
