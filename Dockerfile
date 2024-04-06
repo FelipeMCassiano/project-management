@@ -16,7 +16,7 @@ COPY . .
 # Build TypeScript code
 RUN npm run build
 
-# Expose the port that the app runs on
+
 
 # Command to run the application
 CMD ["node", "./dist/index.js"]
